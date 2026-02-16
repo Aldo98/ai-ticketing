@@ -90,20 +90,32 @@ async def ai_worker(ticket_id: str, message: str):
         ],
         response_format={ "type": "json_object" } # Memastikan output JSON
     )
-    res = json.loads(ai_response.choices[0].message.content)
-    # print(res)
+    if ai_response.choices==None:
+        await db.ticket.update(
+            where={'id': ticket_id},
+            data={
+                'category': None,
+                'urgency': None,
+                'sentiment': None,
+                'aiDraft': None,
+                'status': 'Pending'
+            }
+        )
+    else:
+        res = json.loads(ai_response.choices[0].message.content)
+        # print(res)
     
     # Update ke PostgreSQL menggunakan Prisma
-    await db.ticket.update(
-        where={'id': ticket_id},
-        data={
-            'category': res.get('category'),
-            'urgency': res.get('urgency').upper() if res.get('urgency') else 'LOW',
-            'sentiment': res.get('sentiment'),
-            'aiDraft': encrypt_text(res.get('draft')),
-            'status': 'PROCESSED'
-        }
-    )
+        await db.ticket.update(
+            where={'id': ticket_id},
+            data={
+                'category': res.get('category'),
+                'urgency': res.get('urgency').upper() if res.get('urgency') else 'LOW',
+                'sentiment': res.get('sentiment'),
+                'aiDraft': encrypt_text(res.get('draft')),
+                'status': 'PROCESSED'
+            }
+        )
 
 @app.post("/tickets", status_code=201)
 async def create_ticket(payload: TicketCreate, background_tasks: BackgroundTasks):
@@ -119,6 +131,19 @@ async def create_ticket(payload: TicketCreate, background_tasks: BackgroundTasks
     background_tasks.add_task(ai_worker, new_ticket.id, payload.message)
     
     return {"status": "created", "id": new_ticket.id}
+
+@app.post("/tickets/{ticket_id}/reprocess")
+async def reprocess_ticket(ticket_id: str, background_tasks: BackgroundTasks):
+    ticket = await db.ticket.find_unique(where={'id': ticket_id})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # (Asumsi kamu punya fungsi decrypt_text dari tahap sebelumnya)
+    original_message = decrypt_text(ticket.message)
+
+    background_tasks.add_task(ai_worker, ticket.id, original_message)
+
+    return {"status": "re-processing started"}
 
 @app.get("/tickets")
 async def list_tickets():

@@ -34,14 +34,61 @@ export default function AgentDashboard() {
 
   const handleUpdateDraft = async () => {
     // Logika simpan tanpa menutup tiket
-    alert("Draft updated successfully!");
+    try {
+      const res = await fetch(`http://localhost:8000/tickets/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiDraft: draft, status: selected.status }),
+      });
+
+      if (res.ok) {
+        alert("Draft updated successfully!");
+        setSelected(null);
+        fetchTickets(); // Refresh list
+      }
+    } catch (err) {
+      alert("Gagal mengupdate ticket.");
+    }
+    // alert("Draft updated successfully!");
   };
 
   const handleResolve = async () => {
     if (!confirm("Finalize this ticket? It will be moved to history.")) return;
     // Logika resolve (PATCH status: RESOLVED)
-    setSelected(null);
-    fetchTickets();
+    try {
+      const res = await fetch(`http://localhost:8000/tickets/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiDraft: draft, status: "RESOLVED" }),
+      });
+
+      if (res.ok) {
+        alert("Ticket Resolved!");
+        setSelected(null);
+        fetchTickets(); // Refresh list
+      }
+    } catch (err) {
+      alert("Gagal mengupdate ticket.");
+    }
+    // setSelected(null);
+    // fetchTickets();
+  };
+  const handleReprocess = async () => {
+    if (!selected) return;
+    if (!confirm("Ask AI to re-analyze this ticket? Current draft will be lost.")) return;
+  
+    try {
+      const res = await fetch(`http://localhost:8000/tickets/${selected.id}/reprocess`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        // Kosongkan seleksi atau beri feedback loading
+        // setSelected({ ...selected, aiDraft: null, status: 'PENDING' });
+        fetchTickets(); 
+      }
+    } catch (err) {
+      alert("Failed to trigger AI.");
+    }
   };
 
   return (
@@ -149,25 +196,43 @@ export default function AgentDashboard() {
                 </div>
 
                 {/* --- BUTTON GROUP --- */}
-                <div className="flex gap-4">
-                  {/* UPDATE BUTTON: Biru Outline */}
-                  <button 
-                    onClick={handleUpdateDraft}
-                    className="flex-1 flex items-center justify-center gap-2 py-4 px-6 border-2 border-blue-600 text-blue-600 font-bold rounded-xl hover:bg-blue-50 transition-all active:scale-95"
-                  >
-                    <Save size={20} />
-                    Update Draft
-                  </button>
+                {selected.aiDraft ? 
+                  <>
+                    <div className="flex gap-4">
+                      {/* UPDATE BUTTON: Biru Outline */}
+                      <button 
+                        onClick={handleUpdateDraft}
+                        className="flex-1 flex items-center justify-center gap-2 py-4 px-6 border-2 border-blue-600 text-blue-600 font-bold rounded-xl hover:bg-blue-50 transition-all active:scale-95"
+                      >
+                        <Save size={20} />
+                        Update Draft
+                      </button>
 
-                  {/* RESOLVE BUTTON: Hijau Solid */}
-                  <button 
-                    onClick={handleResolve}
-                    className="flex-[2] flex items-center justify-center gap-2 py-4 px-6 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-95"
-                  >
-                    <CheckCircle size={20} />
-                    Resolve & Close Ticket
-                  </button>
-                </div>
+                      {/* RESOLVE BUTTON: Hijau Solid */}
+                      <button 
+                        onClick={handleResolve}
+                        className="flex-[2] flex items-center justify-center gap-2 py-4 px-6 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                      >
+                        <CheckCircle size={20} />
+                        Resolve & Close Ticket
+                      </button>
+                    </div>
+                  </>
+                :
+                  <>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={handleReprocess}
+                        // disabled={selected.status === 'PENDING'}
+                        className="flex-1 flex items-center justify-center gap-2 py-4 px-4 border-2 border-orange-500 text-orange-600 font-bold rounded-xl hover:bg-orange-50 transition-all disabled:opacity-50"
+                        title="Re-run AI Analysis"
+                      >
+                        <RefreshCcw size={20} className={selected.status === 'PENDING' ? "animate-spin" : ""} />
+                        Retry AI
+                      </button>
+                    </div>
+                  </>
+                }
               </div>
 
             </div>
