@@ -1,0 +1,39 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  recursive_type_depth = 5
+}
+
+enum Urgency {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Status {
+  PENDING
+  PROCESSED
+  RESOLVED
+}
+
+model Ticket {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  userEmail   String
+  message     String   @db.Text
+  category    String?  // Billing, Technical, etc.
+  sentiment   Int?     // 1-10
+  urgency     Urgency?
+  aiDraft     String?  @db.Text
+  status      Status   @default(PENDING)
+}
